@@ -1,0 +1,23 @@
+{
+  "name": "sima-journey-flipbook",
+  "version": "1.0.0",
+  "description": "The SIMA Journey - Interactive 3D Digital Flipbook",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "flipbook",
+    "sima",
+    "vpstart",
+    "digital-book",
+    "3d-flipbook"
+  ],
+  "author": "VP.Start & Geoff Dean",
+  "license": "ISC",
+  "dependencies": {
+    "page-flip": "^2.0.7",
+    "pdfjs-dist": "^3.11.174"
+  }
+}

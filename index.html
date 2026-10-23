@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="obsidian">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+  <title>The SIMA Journey — Interactive 3D Digital Flipbook</title>
+  <meta name="description" content="Experience 'The SIMA Journey' by Geoff Dean and VP.Start in an interactive 3D digital flipbook with authentic page turning, live search, audio effects, and rich typography.">
+  <meta name="theme-color" content="#0B0F19">
+
+  <!-- Open Graph -->
+  <meta property="og:title" content="The SIMA Journey — Interactive 3D Digital Flipbook">
+  <meta property="og:description" content="Innovation through Technology: The Story and Philosophy of VP.Start by Geoff Dean.">
+  <meta property="og:type" content="book">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700;800&family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Project Stylesheet -->
+  <link rel="stylesheet" href="index.css">
+
+  <!-- Vendor Libraries -->
+  <script src="lib/pdf.min.js"></script>
+  <script src="lib/page-flip.browser.js"></script>
+</head>
+<body>
+  <div id="app" class="app-container">
+    
+    <!-- Top Navigation Header -->
+    <header class="top-nav" id="topNav">
+      <div class="nav-brand">
+        <div class="brand-crest">
+          <span class="crest-letter">S</span>
+        </div>
+        <div class="brand-titles">
+          <h1 class="book-main-title">THE SIMA JOURNEY</h1>
+          <span class="book-subtitle">VP.START • GEOFF DEAN</span>
+        </div>
+      </div>
+
+      <!-- Action Buttons -->
+      <div class="nav-actions">
+        <button id="btnToc" class="nav-btn" title="Table of Contents (T)" aria-label="Table of Contents">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M3 4h18v2H3V4zm0 7h12v2H3v-2zm0 7h18v2H3v-2zM17 9l5 4l-5 4V9z"/></svg>
+          <span class="btn-label">Contents</span>
+        </button>
+
+        <button id="btnSearch" class="nav-btn" title="Search Book (S)" aria-label="Search Book">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14z"/></svg>
+          <span class="btn-label">Search</span>
+        </button>
+
+        <button id="btnThumbs" class="nav-btn" title="Thumbnails Grid (G)" aria-label="Thumbnails Grid">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M3 3v8h8V3H3zm6 6H5V5h4v4zm-6 4v8h8v-8H3zm6 6H5v-4h4v4zm4-16v8h8V3h-8zm6 6h-4V5h4v4zm-6 4v8h8v-8h-8zm6 6h-4v-4h4v4z"/></svg>
+          <span class="btn-label">Grid</span>
+        </button>
+
+        <button id="btnBookmark" class="nav-btn" title="Bookmark Current Page (B)" aria-label="Bookmark">
+          <svg class="icon" id="bookmarkIcon" viewBox="0 0 24 24"><path fill="currentColor" d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3l7 3V5c0-1.1-.9-2-2-2zm0 15l-5-2.18L7 18V5h10v13z"/></svg>
+          <span class="btn-label">Bookmark</span>
+        </button>
+
+        <div class="nav-divider"></div>
+
+        <!-- View Mode Toggle -->
+        <button id="btnViewMode" class="nav-btn mode-btn" title="Toggle 3D Flip / Spread View (Z)" aria-label="Toggle View Mode">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM11 7H7v10h4V7zm6 0h-4v10h4V7z"/></svg>
+          <span class="btn-label" id="viewModeLabel">Spread View</span>
+        </button>
+
+        <!-- Theme Selector -->
+        <div class="theme-dropdown">
+          <button id="btnTheme" class="nav-btn icon-only" title="Change Theme" aria-label="Theme">
+            <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 3a9 9 0 1 0 9 9c0-.46-.04-.92-.1-1.36a5.389 5.389 0 0 1-4.4 2.26a5.403 5.403 0 0 1-3.14-9.8c-.44-.06-.9-.1-1.36-.1z"/></svg>
+          </button>
+          <div class="theme-menu" id="themeMenu">
+            <button class="theme-opt active" data-set-theme="obsidian">
+              <span class="swatch swatch-obsidian"></span>
+              <span>Obsidian Slate</span>
+            </button>
+            <button class="theme-opt" data-set-theme="teak">
+              <span class="swatch swatch-teak"></span>
+              <span>Teak & Parchment</span>
+            </button>
+            <button class="theme-opt" data-set-theme="editorial">
+              <span class="swatch swatch-editorial"></span>
+              <span>Gallery Editorial</span>
+            </button>
+            <button class="theme-opt" data-set-theme="cyber">
+              <span class="swatch swatch-cyber"></span>
+              <span>Cyber Grid</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Audio Mute / Unmute -->
+        <button id="btnAudio" class="nav-btn icon-only" title="Toggle Page Flip Sound (M)" aria-label="Audio Toggle">
+          <svg class="icon" id="audioIcon" viewBox="0 0 24 24"><path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+        </button>
+
+        <!-- Help / Shortcuts -->
+        <button id="btnHelp" class="nav-btn icon-only" title="Keyboard Shortcuts (?)" aria-label="Help">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8s8 3.59 8 8s-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5c0-2.21-1.79-4-4-4z"/></svg>
+        </button>
+
+        <!-- Fullscreen Toggle -->
+        <button id="btnFullscreen" class="nav-btn icon-only" title="Fullscreen (F)" aria-label="Fullscreen">
+          <svg class="icon" id="fsIcon" viewBox="0 0 24 24"><path fill="currentColor" d="M7 14H5v5h5v-2H7v-3zm-2-4h2V7h3V5H5v5zm12 7h-3v2h5v-5h-2v3zM14 5v2h3v3h2V5h-5z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Flip Book Reading Canvas Stage -->
+    <main class="reading-stage" id="readingStage">
+      
+      <!-- Stage Ambient Glow & Desk Reflection -->
+      <div class="stage-ambient-light"></div>
+      <div class="desk-mat"></div>
+
+      <!-- Quick Turn Navigation Hit Zones / Floating Arrows -->
+      <button id="navPrev" class="floating-arrow arrow-left" title="Previous Page (Left Arrow)" aria-label="Previous Page">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6l6 6l1.41-1.41z"/></svg>
+      </button>
+
+      <button id="navNext" class="floating-arrow arrow-right" title="Next Page (Right Arrow)" aria-label="Next Page">
+        <svg viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12L8.59 7.41L10 6l6 6l-6 6l-1.41-1.41z"/></svg>
+      </button>
+
+      <!-- Book Container: Mode 1 (3D Flip Book) -->
+      <div class="book-wrapper" id="bookWrapper">
+        <div id="flipbook" class="flipbook">
+          <!-- Pages injected dynamically by app.js -->
+        </div>
+      </div>
+
+      <!-- Book Container: Mode 2 (Cinematic Spread View & Zoom) -->
+      <div class="spread-wrapper" id="spreadWrapper" style="display: none;">
+        <div class="spread-viewport" id="spreadViewport">
+          <div class="spread-canvas-card" id="spreadCard">
+            <canvas id="spreadCanvas"></canvas>
+            <div class="spread-spine-overlay"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Loading State Overlay -->
+      <div class="loading-overlay" id="loadingOverlay">
+        <div class="spinner-crest">
+          <div class="crest-ring"></div>
+          <span class="crest-icon">S</span>
+        </div>
+        <h3 class="loading-title">Opening The SIMA Journey</h3>
+        <p class="loading-sub" id="loadingStatusText">Streaming high-resolution master edition...</p>
+        <div class="loading-bar-wrap">
+          <div class="loading-bar-progress" id="loadingProgressBar"></div>
+        </div>
+      </div>
+
+    </main>
+
+    <!-- Bottom Floating Dock: Scrubber, Page Controls & Zoom -->
+    <footer class="bottom-dock" id="bottomDock">
+      <div class="dock-container">
+        
+        <!-- Left: Quick First / Prev -->
+        <div class="dock-group dock-left">
+          <button id="btnFirst" class="dock-btn icon-only" title="First Page (Home)">
+            <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M18.41 16.59L13.82 12l4.59-4.59L17 6l-6 6l6 6zM6 6h2v12H6z"/></svg>
+          </button>
+          <button id="btnPrevDock" class="dock-btn icon-only" title="Previous Page (←)">
+            <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6l6 6l1.41-1.41z"/></svg>
+          </button>
+        </div>
+
+        <!-- Center: Interactive Scrubber Slider -->
+        <div class="dock-center">
+          <div class="scrubber-track-wrap">
+            <input type="range" id="pageScrubber" min="1" max="254" value="1" step="1" class="scrubber-slider" aria-label="Page Slider">
+            <div class="scrubber-tooltip" id="scrubberTooltip">Spread 1 (p.1-2)</div>
+          </div>
+          <div class="page-status-pill">
+            <span class="page-indicator" id="pageIndicator">Pages 1–2 of 508</span>
+            <span class="status-bullet">•</span>
+            <span class="spread-indicator" id="spreadIndicator">Spread 1 of 254</span>
+            <span class="status-bullet">•</span>
+            <span class="current-chapter-pill" id="currentChapterPill">Cover & Front Matter</span>
+          </div>
+        </div>
+
+        <!-- Right: Next / Last / Jump / Zoom -->
+        <div class="dock-group dock-right">
+          <button id="btnNextDock" class="dock-btn icon-only" title="Next Page (→)">
+            <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M8.59 16.59L13.17 12L8.59 7.41L10 6l6 6l-6 6l-1.41-1.41z"/></svg>
+          </button>
+          <button id="btnLast" class="dock-btn icon-only" title="Last Page (End)">
+            <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M5.59 7.41L10.18 12l-4.59 4.59L7 18l6-6l-6-6zM16 6h2v12h-2z"/></svg>
+          </button>
+
+          <div class="dock-separator"></div>
+
+          <!-- Direct Jump Input -->
+          <div class="jump-box">
+            <label for="jumpInput" class="sr-only">Jump to page</label>
+            <input type="number" id="jumpInput" min="1" max="508" placeholder="Page" class="jump-field">
+            <button id="btnJumpGo" class="jump-go-btn" title="Go to page">Go</button>
+          </div>
+
+          <div class="dock-separator"></div>
+
+          <!-- Zoom & Pan Controls (Active in Spread Mode) -->
+          <div class="zoom-controls" id="zoomControls">
+            <button id="btnZoomOut" class="dock-btn icon-only" title="Zoom Out (-)">
+              <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M19 13H5v-2h14v2z"/></svg>
+            </button>
+            <span class="zoom-level" id="zoomLevelText">100%</span>
+            <button id="btnZoomIn" class="dock-btn icon-only" title="Zoom In (+)">
+              <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+            </button>
+            <button id="btnZoomReset" class="dock-btn icon-only" title="Reset Zoom (0)">
+              <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6c0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6c0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4l-4-4v3z"/></svg>
+            </button>
+          </div>
+
+          <!-- Slideshow / Auto-Play Toggle -->
+          <button id="btnAutoplay" class="dock-btn icon-only" title="Auto-Play Slideshow">
+            <svg class="icon" id="autoplayIcon" viewBox="0 0 24 24"><path fill="currentColor" d="M8 5v14l11-7z"/></svg>
+          </button>
+        </div>
+
+      </div>
+    </footer>
+
+    <!-- Side Drawer: Table of Contents -->
+    <aside class="side-drawer" id="tocDrawer" aria-hidden="true">
+      <div class="drawer-header">
+        <div class="drawer-title-wrap">
+          <svg class="drawer-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M3 4h18v2H3V4zm0 7h12v2H3v-2zm0 7h18v2H3v-2zM17 9l5 4l-5 4V9z"/></svg>
+          <h2 class="drawer-title">Table of Contents</h2>
+        </div>
+        <button class="drawer-close-btn" id="closeToc" aria-label="Close Table of Contents">✕</button>
+      </div>
+
+      <!-- Category Filter Tabs -->
+      <div class="toc-filter-bar">
+        <button class="toc-tab active" data-filter="all">All</button>
+        <button class="toc-tab" data-filter="timeline">Timeline</button>
+        <button class="toc-tab" data-filter="story">Story</button>
+        <button class="toc-tab" data-filter="ideology">Ideology</button>
+        <button class="toc-tab" data-filter="methodology">Methodology</button>
+        <button class="toc-tab" data-filter="architecture">Architecture</button>
+      </div>
+
+      <!-- TOC Entries List -->
+      <div class="drawer-content toc-list" id="tocList">
+        <!-- Rendered by JS -->
+      </div>
+    </aside>
+
+    <!-- Side Drawer: Full-Text Live Search -->
+    <aside class="side-drawer" id="searchDrawer" aria-hidden="true">
+      <div class="drawer-header">
+        <div class="drawer-title-wrap">
+          <svg class="drawer-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5A6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5S14 7.01 14 9.5S11.99 14 9.5 14z"/></svg>
+          <h2 class="drawer-title">Search The Book</h2>
+        </div>
+        <button class="drawer-close-btn" id="closeSearch" aria-label="Close Search">✕</button>
+      </div>
+
+      <div class="search-input-wrap">
+        <input type="text" id="searchInput" placeholder="Search keywords (e.g., Phally, DRC, SCADA, Angkorian)..." class="search-field" autocomplete="off">
+        <button id="clearSearch" class="clear-btn" style="display: none;">✕</button>
+      </div>
+
+      <!-- Popular Quick-Search Suggestions -->
+      <div class="search-chips">
+        <span class="chips-label">Popular:</span>
+        <button class="chip" data-query="Phally">Phally</button>
+        <button class="chip" data-query="DRC">DRC</button>
+        <button class="chip" data-query="EDC">EDC</button>
+        <button class="chip" data-query="Cambodia">Cambodia</button>
+        <button class="chip" data-query="SCADA">SCADA</button>
+        <button class="chip" data-query="Angkorian">Angkorian</button>
+        <button class="chip" data-query="Einstein">Einstein</button>
+        <button class="chip" data-query="IoT">IoT</button>
+      </div>
+
+      <!-- Search Results Stats & List -->
+      <div class="search-results-meta" id="searchMeta">Type a word to search across 508 pages</div>
+      <div class="drawer-content search-results-list" id="searchResultsList"></div>
+    </aside>
+
+    <!-- Side Drawer: Thumbnails Grid -->
+    <aside class="side-drawer wide-drawer" id="thumbsDrawer" aria-hidden="true">
+      <div class="drawer-header">
+        <div class="drawer-title-wrap">
+          <svg class="drawer-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M3 3v8h8V3H3zm6 6H5V5h4v4zm-6 4v8h8v-8H3zm6 6H5v-4h4v4zm4-16v8h8V3h-8zm6 6h-4V5h4v4zm-6 4v8h8v-8h-8zm6 6h-4v-4h4v4z"/></svg>
+          <h2 class="drawer-title">Page Overview (254 Spreads)</h2>
+        </div>
+        <button class="drawer-close-btn" id="closeThumbs" aria-label="Close Overview">✕</button>
+      </div>
+
+      <div class="drawer-content thumbs-grid" id="thumbsGrid">
+        <!-- Injected dynamically by JS with lazy loading -->
+      </div>
+    </aside>
+
+    <!-- Side Drawer: Bookmarks -->
+    <aside class="side-drawer" id="bookmarksDrawer" aria-hidden="true">
+      <div class="drawer-header">
+        <div class="drawer-title-wrap">
+          <svg class="drawer-icon" viewBox="0 0 24 24"><path fill="currentColor" d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3l7 3V5c0-1.1-.9-2-2-2z"/></svg>
+          <h2 class="drawer-title">Saved Bookmarks</h2>
+        </div>
+        <button class="drawer-close-btn" id="closeBookmarks" aria-label="Close Bookmarks">✕</button>
+      </div>
+      <div class="drawer-content bookmarks-list" id="bookmarksList">
+        <div class="empty-state">No bookmarks yet. Click the Bookmark icon in the header or press 'B' to save pages!</div>
+      </div>
+    </aside>
+
+    <!-- Modal: Keyboard Shortcuts Help -->
+    <div class="modal-backdrop" id="helpModal" aria-hidden="true">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h3 class="modal-title">Keyboard Shortcuts & Controls</h3>
+          <button class="modal-close-btn" id="closeHelp">✕</button>
+        </div>
+        <div class="modal-body">
+          <div class="shortcut-grid">
+            <div class="shortcut-row">
+              <span class="keys"><kbd>→</kbd> or <kbd>Space</kbd></span>
+              <span class="desc">Next page / spread</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>←</kbd> or <kbd>Shift</kbd>+<kbd>Space</kbd></span>
+              <span class="desc">Previous page / spread</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>Home</kbd> / <kbd>End</kbd></span>
+              <span class="desc">Jump to first / last page</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>Z</kbd></span>
+              <span class="desc">Toggle 3D Flip vs Cinema Spread mode</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>F</kbd></span>
+              <span class="desc">Toggle fullscreen</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>M</kbd></span>
+              <span class="desc">Toggle page-flip sound effect</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>T</kbd></span>
+              <span class="desc">Open Table of Contents</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>S</kbd></span>
+              <span class="desc">Open Full-Text Search</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>G</kbd></span>
+              <span class="desc">Open Thumbnail Grid</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>B</kbd></span>
+              <span class="desc">Toggle Bookmark on current page</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>+</kbd> / <kbd>-</kbd> / <kbd>0</kbd></span>
+              <span class="desc">Zoom in / Zoom out / Reset zoom</span>
+            </div>
+            <div class="shortcut-row">
+              <span class="keys"><kbd>Esc</kbd></span>
+              <span class="desc">Close open drawer or modal</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Backdrop Dimmer for side drawers -->
+    <div class="drawer-backdrop" id="drawerBackdrop"></div>
+
+  </div>
+
+  <!-- Main Application Logic -->
+  <script src="app.js"></script>
+</body>
+</html>
