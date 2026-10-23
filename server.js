@@ -4,7 +4,8 @@ const path = require('path');
 
 const PORT = process.env.PORT || 3000;
 const ROOT = __dirname;
-const PDF_PATH = path.join(ROOT, 'The SIMA Journey Book .pdf');
+const PDF_NAME = fs.existsSync(path.join(ROOT, 'book.pdf')) ? 'book.pdf' : 'The SIMA Journey Book .pdf';
+const PDF_PATH = path.join(ROOT, PDF_NAME);
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -140,10 +141,16 @@ const server = http.createServer((req, res) => {
   });
 });
 
-server.listen(PORT, () => {
-  console.log(`\n======================================================`);
-  console.log(`  📖 THE SIMA JOURNEY - INTERACTIVE 3D FLIPBOOK`);
-  console.log(`  Server running at: http://localhost:${PORT}`);
-  console.log(`  PDF Streaming with HTTP 206 Partial Content enabled`);
-  console.log(`======================================================\n`);
-});
+// Export server for serverless / testing environments
+module.exports = server;
+
+// Only listen on port if run directly or outside Vercel
+if (require.main === module || !process.env.VERCEL) {
+  server.listen(PORT, () => {
+    console.log(`\n======================================================`);
+    console.log(`  📖 THE SIMA JOURNEY - INTERACTIVE 3D FLIPBOOK`);
+    console.log(`  Server running at: http://localhost:${PORT}`);
+    console.log(`  PDF Streaming with HTTP 206 Partial Content enabled`);
+    console.log(`======================================================\n`);
+  });
+}

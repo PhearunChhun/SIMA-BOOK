@@ -2,7 +2,6 @@
   "name": "sima-journey-flipbook",
   "version": "1.0.0",
   "description": "The SIMA Journey - Interactive 3D Digital Flipbook",
-  "main": "server.js",
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js"
