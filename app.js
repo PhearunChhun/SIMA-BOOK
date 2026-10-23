@@ -327,24 +327,36 @@
     const pLeft = (s - 1) * 2 + 1;
     const pRight = s * 2;
     const chapter = getChapterForSpread(s);
+    const isPortrait = state.viewMode === 'flip' && state.pageFlip && state.pageFlip.getOrientation() === 'portrait';
 
     // Update Indicators
-    DOM.pageIndicator.textContent = `Pages ${pLeft}–${pRight} of ${state.totalPages}`;
-    DOM.spreadIndicator.textContent = `Spread ${s} of ${state.totalSpreads}`;
+    if (isPortrait) {
+      const pageIdx = state.pageFlip.getCurrentPageIndex();
+      const pageNum = pageIdx + 1;
+      DOM.pageIndicator.textContent = `Page ${pageNum} of ${state.totalPages}`;
+      DOM.spreadIndicator.textContent = `p. ${pageNum}`;
+      DOM.scrubberTooltip.textContent = `Page ${pageNum}`;
+      DOM.pageScrubber.value = Math.min(state.totalSpreads, Math.floor(pageIdx / 2) + 1);
+    } else {
+      DOM.pageIndicator.textContent = `Pages ${pLeft}–${pRight} of ${state.totalPages}`;
+      DOM.spreadIndicator.textContent = `Spread ${s} of ${state.totalSpreads}`;
+      DOM.scrubberTooltip.textContent = `Spread ${s} (p.${pLeft}–${pRight})`;
+      DOM.pageScrubber.value = s;
+    }
+
     DOM.currentChapterPill.textContent = chapter;
     DOM.currentChapterPill.title = chapter;
 
-    // Update Scrubber
-    DOM.pageScrubber.value = s;
-    DOM.scrubberTooltip.textContent = `Spread ${s} (p.${pLeft}–${pRight})`;
-
     // Update Nav Buttons
-    DOM.navPrev.disabled = s <= 1;
-    DOM.navNext.disabled = s >= state.totalSpreads;
-    DOM.btnPrevDock.disabled = s <= 1;
-    DOM.btnNextDock.disabled = s >= state.totalSpreads;
-    DOM.btnFirst.disabled = s <= 1;
-    DOM.btnLast.disabled = s >= state.totalSpreads;
+    const canPrev = isPortrait ? state.pageFlip.getCurrentPageIndex() > 0 : s > 1;
+    const canNext = isPortrait ? state.pageFlip.getCurrentPageIndex() < state.totalPages - 1 : s < state.totalSpreads;
+
+    DOM.navPrev.disabled = !canPrev;
+    DOM.navNext.disabled = !canNext;
+    DOM.btnPrevDock.disabled = !canPrev;
+    DOM.btnNextDock.disabled = !canNext;
+    DOM.btnFirst.disabled = !canPrev;
+    DOM.btnLast.disabled = !canNext;
 
     // Update Active TOC & Thumbs
     document.querySelectorAll('.toc-entry').forEach(el => {
@@ -403,13 +415,21 @@
   }
 
   function nextSpread() {
-    if (state.currentSpread < state.totalSpreads) {
+    if (state.viewMode === 'flip' && state.pageFlip) {
+      if (state.pageFlip.getCurrentPageIndex() < state.totalPages - 1) {
+        state.pageFlip.flipNext('bottom');
+      }
+    } else if (state.currentSpread < state.totalSpreads) {
       goToSpread(state.currentSpread + 1);
     }
   }
 
   function prevSpread() {
-    if (state.currentSpread > 1) {
+    if (state.viewMode === 'flip' && state.pageFlip) {
+      if (state.pageFlip.getCurrentPageIndex() > 0) {
+        state.pageFlip.flipPrev('bottom');
+      }
+    } else if (state.currentSpread > 1) {
       goToSpread(state.currentSpread - 1);
     }
   }
@@ -667,17 +687,17 @@
         width: 432,
         height: 648,
         size: 'stretch',
-        minWidth: 300,
-        maxWidth: 720,
-        minHeight: 450,
-        maxHeight: 1080,
+        minWidth: 160,
+        maxWidth: 864,
+        minHeight: 220,
+        maxHeight: 1296,
         maxShadowOpacity: 0.5,
         showCover: false,
         usePortrait: true,
-        flippingTime: 700,
+        flippingTime: 550,
         mobileScrollSupport: true,
         useMouseEvents: true,
-        swipeDistance: 30
+        swipeDistance: 25
       });
 
       // Load directly from hardware-accelerated WebP page images
@@ -686,17 +706,19 @@
       state.pageFlip.on('flip', (e) => {
         const pageIdx = e.data;
         const newSpread = Math.floor(pageIdx / 2) + 1;
-        if (state.currentSpread !== newSpread) {
-          state.currentSpread = newSpread;
-          playPaperTurnSound();
-          updateUIState();
-        }
+        state.currentSpread = newSpread;
+        playPaperTurnSound();
+        updateUIState();
       });
 
       state.pageFlip.on('changeState', (e) => {
         if (e.data === 'flipping') {
           playPaperTurnSound();
         }
+      });
+
+      state.pageFlip.on('changeOrientation', () => {
+        updateUIState();
       });
 
     } catch (err) {
@@ -725,8 +747,8 @@
       const deltaY = touchEndY - state.touchStartY;
       const elapsed = Date.now() - state.touchStartTime;
 
-      // Horizontal swipe detection (> 45px, mostly horizontal)
-      if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5 && elapsed < 400) {
+      // Horizontal swipe detection (> 35px, predominantly horizontal, < 400ms)
+      if (Math.abs(deltaX) > 35 && Math.abs(deltaX) > Math.abs(deltaY) * 1.3 && elapsed < 400) {
         if (deltaX < 0) {
           nextSpread(); // Swipe Left -> Next
         } else {
@@ -736,7 +758,7 @@
     }, { passive: true });
   }
 
-  // --- Spread Mode: Zoom & Pan Handlers ---
+  // --- Spread Mode: Zoom, Pan & Mobile Pinch-Zoom Handlers ---
   function initSpreadZoomAndPan() {
     const vp = DOM.spreadViewport;
 
@@ -766,6 +788,7 @@
       applySpreadZoomAndPan();
     }, { passive: false });
 
+    // Desktop Mouse Pan
     vp.addEventListener('mousedown', (e) => {
       if (state.zoom <= 1.0) return;
       state.isPanning = true;
@@ -786,6 +809,49 @@
         vp.classList.remove('grabbing');
       }
     });
+
+    // Mobile Multi-Touch Pinch-to-Zoom & Pan
+    let initialPinchDistance = 0;
+    let initialZoom = 1.0;
+
+    vp.addEventListener('touchstart', (e) => {
+      if (state.viewMode !== 'spread') return;
+      if (e.touches.length === 2) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        initialPinchDistance = Math.hypot(dx, dy);
+        initialZoom = state.zoom;
+      } else if (e.touches.length === 1 && state.zoom > 1.0) {
+        state.isPanning = true;
+        state.panStart = { x: e.touches[0].clientX - state.pan.x, y: e.touches[0].clientY - state.pan.y };
+      }
+    }, { passive: true });
+
+    vp.addEventListener('touchmove', (e) => {
+      if (state.viewMode !== 'spread') return;
+      if (e.touches.length === 2 && initialPinchDistance > 0) {
+        const dx = e.touches[0].clientX - e.touches[1].clientX;
+        const dy = e.touches[0].clientY - e.touches[1].clientY;
+        const currentDistance = Math.hypot(dx, dy);
+        const factor = currentDistance / initialPinchDistance;
+        state.zoom = Math.min(3.0, Math.max(1.0, initialZoom * factor));
+        if (state.zoom === 1.0) state.pan = { x: 0, y: 0 };
+        applySpreadZoomAndPan();
+      } else if (e.touches.length === 1 && state.isPanning) {
+        state.pan.x = e.touches[0].clientX - state.panStart.x;
+        state.pan.y = e.touches[0].clientY - state.panStart.y;
+        applySpreadZoomAndPan();
+      }
+    }, { passive: true });
+
+    vp.addEventListener('touchend', (e) => {
+      if (e.touches.length < 2) {
+        initialPinchDistance = 0;
+      }
+      if (e.touches.length === 0) {
+        state.isPanning = false;
+      }
+    }, { passive: true });
   }
 
   // --- Keyboard Shortcuts ---
@@ -1024,13 +1090,6 @@
     initSpreadZoomAndPan();
     initMobileTouchGestures();
 
-    // Check if mobile screen (width < 768px): default to Spread view for best mobile reading
-    if (window.innerWidth < 768) {
-      state.viewMode = 'spread';
-      DOM.bookWrapper.style.display = 'none';
-      DOM.spreadWrapper.style.display = 'flex';
-      DOM.viewModeLabel.textContent = '3D Flip Book';
-    }
 
     try {
       DOM.loadingStatusText.textContent = "Loading book chapters & index...";

@@ -36,6 +36,12 @@
   --dock-height: 84px;
   --transition-fast: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   --transition-normal: 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* iOS / Mobile Safe Area Insets */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 /* Theme 2: Teak & Parchment (Warm Library) */
@@ -1495,22 +1501,401 @@ kbd {
   display: block;
 }
 
-/* --- Responsive Media Queries --- */
-@media (max-width: 900px) {
+/* --- Comprehensive Responsive Media Queries --- */
+
+/* Tablets & Small Laptops (<= 1024px) */
+@media (max-width: 1024px) {
   .book-subtitle { display: none; }
   .btn-label { display: none; }
-  .floating-arrow { width: 44px; height: 44px; }
-  .arrow-left { left: 8px; }
-  .arrow-right { right: 8px; }
-  .current-chapter-pill { display: none; }
-  .bottom-dock { width: calc(100% - 24px); bottom: 10px; padding: 0 12px; }
-  .zoom-controls { display: none; }
+  .dock-right .jump-box,
+  .dock-separator:first-of-type { display: none; }
+  .current-chapter-pill {
+    max-width: 180px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
-@media (max-width: 600px) {
-  .top-nav { padding: 0 12px; }
-  .brand-crest { width: 32px; height: 32px; font-size: 18px; }
-  .book-main-title { font-size: 14px; }
-  .dock-left, .dock-right .jump-box { display: none; }
-  .reading-stage { padding: 10px 10px calc(var(--dock-height) + 10px) 10px; }
+/* Tablets in Portrait, Foldables & Large Phones (<= 768px) */
+@media (max-width: 768px) {
+  :root {
+    --nav-height: 56px;
+    --dock-height: 62px;
+  }
+
+  .top-nav {
+    height: var(--nav-height);
+    padding: var(--safe-top) max(12px, var(--safe-right)) 0 max(12px, var(--safe-left));
+  }
+
+  .nav-brand {
+    gap: 10px;
+  }
+
+  .brand-crest {
+    width: 32px;
+    height: 32px;
+    font-size: 17px;
+  }
+
+  .crest-letter {
+    font-size: 17px;
+  }
+
+  .book-main-title {
+    font-size: 13.5px;
+    letter-spacing: 1px;
+  }
+
+  .nav-actions {
+    gap: 5px;
+  }
+
+  .nav-btn {
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+
+  .nav-btn .icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  /* Hide low-priority buttons on smaller screens to prevent header wrapping */
+  #btnHelp,
+  .nav-actions a[download],
+  #btnBookmark,
+  .nav-divider {
+    display: none;
+  }
+
+  /* Stage & Floating Arrows */
+  .reading-stage {
+    padding: 8px 10px calc(var(--dock-height) + 12px) 10px;
+  }
+
+  .floating-arrow {
+    width: 40px;
+    height: 40px;
+  }
+
+  .floating-arrow svg {
+    width: 22px;
+    height: 22px;
+  }
+
+  .arrow-left { left: 8px; }
+  .arrow-right { right: 8px; }
+
+  /* Bottom Dock */
+  .bottom-dock {
+    height: var(--dock-height);
+    width: calc(100% - 20px);
+    bottom: max(8px, var(--safe-bottom));
+    padding: 0 10px;
+    border-radius: 14px;
+  }
+
+  .dock-left #btnFirst,
+  .dock-right #btnLast,
+  .dock-right #btnAutoplay,
+  .dock-separator {
+    display: none;
+  }
+
+  .dock-center {
+    flex: 1;
+  }
+
+  .page-status-pill .current-chapter-pill,
+  .page-status-pill .status-bullet {
+    display: none;
+  }
+
+  .page-status-pill {
+    font-size: 11px;
+    padding: 2px 10px;
+  }
+
+  /* Drawers: full viewport width on mobile */
+  .side-drawer,
+  .side-drawer.wide-drawer {
+    width: 100vw;
+    max-width: 100vw;
+    border-radius: 0;
+  }
+
+  .thumbs-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    padding: 12px;
+  }
+}
+
+/* Standard Mobile Devices (<= 540px) */
+@media (max-width: 540px) {
+  :root {
+    --nav-height: 50px;
+    --dock-height: 56px;
+  }
+
+  .top-nav {
+    height: var(--nav-height);
+    padding: var(--safe-top) max(8px, var(--safe-right)) 0 max(8px, var(--safe-left));
+  }
+
+  .brand-crest {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .crest-letter {
+    font-size: 15px;
+  }
+
+  .book-main-title {
+    font-size: 12px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Keep essential reading tools only in mobile top bar */
+  #btnAudio,
+  #btnFullscreen {
+    display: none;
+  }
+
+  .nav-actions {
+    gap: 3px;
+  }
+
+  .nav-btn {
+    padding: 6px;
+    border-radius: 6px;
+  }
+
+  .nav-btn .icon {
+    width: 17px;
+    height: 17px;
+  }
+
+  /* Hide floating arrows on phone portrait; thumb swipe handles navigation cleanly */
+  .floating-arrow {
+    display: none !important;
+  }
+
+  .reading-stage {
+    padding: 6px 6px calc(var(--dock-height) + 8px) 6px;
+  }
+
+  /* Bottom Dock Mobile Layout */
+  .bottom-dock {
+    height: var(--dock-height);
+    width: calc(100% - 12px);
+    bottom: max(6px, var(--safe-bottom));
+    padding: 0 6px;
+    border-radius: 12px;
+  }
+
+  .dock-btn.icon-only {
+    width: 36px;
+    height: 36px;
+    padding: 6px;
+  }
+
+  .dock-btn .icon {
+    width: 19px;
+    height: 19px;
+  }
+
+  .page-indicator {
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
+  .spread-indicator {
+    font-size: 10px;
+  }
+
+  /* Drawer Improvements on Phone */
+  .drawer-header {
+    height: 50px;
+    padding: 0 14px;
+  }
+
+  .drawer-title {
+    font-size: 15px;
+  }
+
+  .drawer-close-btn {
+    width: 38px;
+    height: 38px;
+    font-size: 18px;
+  }
+
+  .drawer-content {
+    padding: 10px;
+    padding-bottom: max(32px, var(--safe-bottom));
+  }
+
+  .toc-entry {
+    padding: 11px 10px;
+    min-height: 44px;
+  }
+
+  .toc-entry-title {
+    font-size: 12.5px;
+    max-width: 210px;
+  }
+
+  .thumbs-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 8px;
+  }
+
+  /* Crucial for iOS: 16px font-size prevents viewport auto-zooming on focus */
+  .search-field {
+    font-size: 16px;
+    padding: 10px 36px 10px 12px;
+  }
+
+  /* Spread Card Mobile Containment */
+  .spread-canvas-card canvas,
+  .spread-canvas-card img.spread-img {
+    max-width: 98vw;
+    max-height: calc(100vh - var(--nav-height) - var(--dock-height) - 24px);
+  }
+}
+
+/* Extra Small Phones (<= 380px, e.g. iPhone SE / Galaxy Mini) */
+@media (max-width: 380px) {
+  .book-main-title {
+    display: none;
+  }
+
+  .nav-brand {
+    gap: 0;
+  }
+
+  .page-indicator {
+    font-size: 9.5px;
+  }
+
+  .spread-indicator {
+    font-size: 9px;
+  }
+}
+
+/* Mobile Landscape Orientation (Optimized for side-by-side reading on phones) */
+@media (max-height: 520px) and (orientation: landscape) {
+  :root {
+    --nav-height: 42px;
+    --dock-height: 46px;
+  }
+
+  .top-nav {
+    height: var(--nav-height);
+    padding: var(--safe-top) max(12px, var(--safe-right)) 0 max(12px, var(--safe-left));
+  }
+
+  .brand-crest {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+  }
+
+  .crest-letter {
+    font-size: 13px;
+  }
+
+  .book-main-title {
+    font-size: 12px;
+    letter-spacing: 1px;
+  }
+
+  .book-subtitle,
+  .btn-label,
+  #btnHelp,
+  .nav-actions a[download],
+  #btnBookmark,
+  .nav-divider {
+    display: none;
+  }
+
+  .nav-actions {
+    gap: 3px;
+  }
+
+  .nav-btn {
+    padding: 4px 6px;
+  }
+
+  .nav-btn .icon {
+    width: 15px;
+    height: 15px;
+  }
+
+  /* Stage & Spread Container in Landscape */
+  .reading-stage {
+    padding: 2px 8px calc(var(--dock-height) + 4px) 8px;
+  }
+
+  .floating-arrow {
+    width: 32px;
+    height: 32px;
+  }
+
+  .floating-arrow svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  .arrow-left { left: 4px; }
+  .arrow-right { right: 4px; }
+
+  /* Bottom Dock Landscape Layout */
+  .bottom-dock {
+    height: var(--dock-height);
+    width: calc(100% - 16px);
+    bottom: max(3px, var(--safe-bottom));
+    padding: 0 8px;
+    border-radius: 10px;
+  }
+
+  .dock-btn.icon-only {
+    width: 30px;
+    height: 30px;
+    padding: 4px;
+  }
+
+  .dock-btn .icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .dock-left #btnFirst,
+  .dock-right #btnLast,
+  .dock-right #btnAutoplay,
+  .dock-separator,
+  .dock-right .jump-box {
+    display: none;
+  }
+
+  .page-status-pill {
+    font-size: 10px;
+    padding: 1px 6px;
+  }
+
+  .page-status-pill .current-chapter-pill,
+  .page-status-pill .status-bullet {
+    display: none;
+  }
+
+  .spread-canvas-card canvas,
+  .spread-canvas-card img.spread-img {
+    max-height: calc(100vh - var(--nav-height) - var(--dock-height) - 8px);
+    max-width: 96vw;
+  }
 }
