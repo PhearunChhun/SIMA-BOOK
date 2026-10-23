@@ -321,6 +321,74 @@
     DOM.zoomLevelText.textContent = `${Math.round(state.zoom * 100)}%`;
   }
 
+  // --- Responsive Book Sizing & Layout Manager ---
+  function updateBookLayout() {
+    const stage = DOM.readingStage;
+    if (!stage) return;
+    const stageW = stage.clientWidth;
+    const stageH = stage.clientHeight;
+    if (!stageW || !stageH) return;
+
+    // Detect single-page portrait vs 2-page landscape spread:
+    // Mobile phones in portrait (< 768px and taller than wide) or vertical tablets (<= 820px and H >= 1000px)
+    const isPortrait = (window.innerWidth < 768 && window.innerHeight > window.innerWidth) ||
+                       (window.innerWidth <= 820 && window.innerHeight >= 1000);
+    document.body.classList.toggle('portrait-mode', isPortrait);
+
+    // Book aspect ratio: 2/3 for single portrait page, 4/3 for 2-page landscape spread
+    const aspectRatio = isPortrait ? (2 / 3) : (4 / 3);
+
+    // Safety margins: on wide landscape screens (>= 768px), keep 140px (70px per side) clearance for floating turn arrows
+    const horizontalMargin = (!isPortrait && window.innerWidth >= 768) ? 140 : 20;
+    const verticalMargin = 16; // 8px breathing room top and bottom
+
+    const maxW = Math.max(260, stageW - horizontalMargin);
+    const maxH = Math.max(200, stageH - verticalMargin);
+
+    let w = maxW;
+    let h = w / aspectRatio;
+
+    // Strict vertical containment within stage bounds
+    if (h > maxH) {
+      h = maxH;
+      w = h * aspectRatio;
+    }
+
+    // Maximum book size for huge 4K displays to preserve crisp typography
+    const hardMaxW = isPortrait ? 600 : 1320;
+    if (w > hardMaxW) {
+      w = hardMaxW;
+      h = w / aspectRatio;
+    }
+
+    // Round to even integers for sub-pixel crisp rendering on 200% / Retina displays
+    const finalW = Math.round(w / 2) * 2;
+    const finalH = Math.round(h / 2) * 2;
+
+    const fb = DOM.flipbook;
+    if (fb) {
+      fb.style.width = `${finalW}px`;
+      fb.style.height = `${finalH}px`;
+      fb.style.minWidth = `${finalW}px`;
+      fb.style.maxWidth = `${finalW}px`;
+      fb.style.minHeight = `${finalH}px`;
+      fb.style.maxHeight = `${finalH}px`;
+
+      const wrapper = fb.querySelector('.stf__wrapper');
+      if (wrapper) {
+        wrapper.style.width = '100%';
+        wrapper.style.height = '100%';
+        wrapper.style.paddingBottom = '0px';
+      }
+    }
+
+    if (state.viewMode === 'spread') {
+      updateSpreadView();
+    } else if (state.pageFlip) {
+      state.pageFlip.update();
+    }
+  }
+
   // --- UI Synchronizer ---
   function updateUIState() {
     const s = state.currentSpread;
@@ -450,8 +518,8 @@
       DOM.viewModeLabel.textContent = 'Spread View';
       DOM.btnViewMode.title = 'Switch to Full Spread & Deep Zoom View (Z)';
       DOM.zoomControls.style.display = 'none';
+      updateBookLayout();
       if (state.pageFlip) {
-        state.pageFlip.update();
         state.pageFlip.turnToPage((state.currentSpread - 1) * 2);
       }
       preloadNearbyImages(state.currentSpread);
@@ -682,18 +750,22 @@
       pageUrls.push(`assets/pages/page_${p}.webp`);
     }
 
+    // Pre-calculate and apply optimal book layout before instantiating StPageFlip
+    updateBookLayout();
+
     try {
       state.pageFlip = new window.St.PageFlip(container, {
         width: 432,
         height: 648,
         size: 'stretch',
-        minWidth: 390,
+        minWidth: 240,
         maxWidth: 900,
-        minHeight: 250,
+        minHeight: 200,
         maxHeight: 1400,
         maxShadowOpacity: 0.5,
         showCover: false,
         usePortrait: true,
+        autoSize: false, // Prevents library from injecting inline width: 100% and padding-bottom: 75%
         flippingTime: 550,
         mobileScrollSupport: true,
         useMouseEvents: true,
@@ -702,6 +774,10 @@
 
       // Load directly from hardware-accelerated WebP page images
       state.pageFlip.loadFromImages(pageUrls);
+
+      state.pageFlip.on('init', () => {
+        updateBookLayout();
+      });
 
       state.pageFlip.on('flip', (e) => {
         const pageIdx = e.data;
@@ -718,6 +794,7 @@
       });
 
       state.pageFlip.on('changeOrientation', () => {
+        updateBookLayout();
         updateUIState();
       });
 
@@ -1071,36 +1148,20 @@
       }
     });
 
-    // --- Layout & Orientation Manager ---
-    function updateLayoutOrientation() {
-      const isPortrait = window.innerWidth < 780 && window.innerHeight > window.innerWidth;
-      const prev = document.body.classList.contains('portrait-mode');
-      document.body.classList.toggle('portrait-mode', isPortrait);
-      if (prev !== isPortrait && state.pageFlip) {
-        setTimeout(() => {
-          state.pageFlip.update();
-          updateUIState();
-        }, 60);
-      }
-    }
-
+    // --- Smooth Resize & Orientation Sizing Listeners ---
+    let resizeFrame = null;
     window.addEventListener('resize', () => {
-      updateLayoutOrientation();
-      if (state.viewMode === 'spread') {
-        updateSpreadView();
-      } else if (state.pageFlip) {
-        state.pageFlip.update();
-      }
+      cancelAnimationFrame(resizeFrame);
+      resizeFrame = requestAnimationFrame(() => {
+        updateBookLayout();
+        updateUIState();
+      });
     });
 
     window.addEventListener('orientationchange', () => {
       setTimeout(() => {
-        updateLayoutOrientation();
-        if (state.viewMode === 'spread') {
-          updateSpreadView();
-        } else if (state.pageFlip) {
-          state.pageFlip.update();
-        }
+        updateBookLayout();
+        updateUIState();
       }, 150);
     });
   }
@@ -1114,10 +1175,7 @@
     initKeyboardControls();
     initSpreadZoomAndPan();
     initMobileTouchGestures();
-    
-    // Initial layout orientation detection
-    const isPortrait = window.innerWidth < 780 && window.innerHeight > window.innerWidth;
-    document.body.classList.toggle('portrait-mode', isPortrait);
+    updateBookLayout();
 
 
     try {

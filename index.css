@@ -380,6 +380,19 @@ button:focus-visible {
   filter: blur(80px);
 }
 
+.desk-mat {
+  position: absolute;
+  bottom: 5%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(85vw, 1100px);
+  height: 100px;
+  background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.5) 0%, transparent 70%);
+  pointer-events: none;
+  filter: blur(24px);
+  z-index: 0;
+}
+
 /* Floating Navigation Arrows */
 .floating-arrow {
   position: absolute;
@@ -437,52 +450,54 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   perspective: 2500px;
+  overflow: visible;
 }
 
 /* StPageFlip Flipbook */
 .flipbook {
   position: relative;
-  box-shadow: var(--book-shadow);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  transition: box-shadow var(--transition-normal);
+  margin: 0 auto;
+}
+
+#flipbook {
+  position: relative;
+  display: block;
+  margin: 0 auto;
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
   border-radius: 6px;
   transition: box-shadow var(--transition-normal);
   max-width: 100%;
   max-height: 100%;
 }
 
-/* Landscape 2-page mode (Desktop, Laptop, Tablet landscape) */
-#flipbook {
-  width: 100%;
-  max-width: calc((100dvh - var(--nav-height) - var(--dock-height) - 36px) * (4 / 3));
-  aspect-ratio: 4 / 3;
+/* StPageFlip Canvas & Wrapper Containment */
+#flipbook.stf__parent {
+  display: block !important;
+  position: relative !important;
+  margin: 0 auto !important;
 }
 
-/* Portrait 1-page mode (Mobile Phones in Portrait, Tablets in Portrait) */
-body.portrait-mode #flipbook {
-  width: 100%;
-  max-width: min(calc(100vw - 20px), calc((100dvh - var(--nav-height) - var(--dock-height) - 20px) * (2 / 3)));
-  aspect-ratio: 2 / 3;
-}
-
-/* Ensure StPageFlip canvas fills aspect-ratio container without overflowing */
-.flipbook .stf__parent {
-  width: 100% !important;
-  height: 100% !important;
-  max-width: 100% !important;
-  max-height: 100% !important;
-  min-width: 0 !important;
-  min-height: 0 !important;
-}
-
-.flipbook .stf__wrapper {
+#flipbook .stf__wrapper {
+  position: relative !important;
   width: 100% !important;
   height: 100% !important;
   padding-bottom: 0 !important;
+  overflow: hidden !important;
+  border-radius: 6px !important;
 }
 
-.flipbook canvas {
+#flipbook canvas,
+#flipbook .stf__canvas {
+  position: absolute !important;
   width: 100% !important;
   height: 100% !important;
-  object-fit: contain;
+  left: 0 !important;
+  top: 0 !important;
+  object-fit: contain !important;
+  border-radius: 6px !important;
 }
 
 /* Page Item Inside StPageFlip */
@@ -646,12 +661,17 @@ body.portrait-mode #flipbook {
 
 .spread-canvas-card {
   position: relative;
-  box-shadow: var(--book-shadow);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 4px 16px rgba(0, 0, 0, 0.25);
   border-radius: 6px;
   overflow: hidden;
   background: #FFFFFF;
   transition: transform 0.1s ease-out;
   transform-origin: center center;
+  max-width: calc(100% - 140px);
+  max-height: calc(100% - 20px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .spread-canvas-card.flipping-next {
@@ -677,13 +697,14 @@ body.portrait-mode #flipbook {
 .spread-canvas-card canvas,
 .spread-canvas-card img.spread-img {
   display: block;
-  max-width: 90vw;
-  max-height: 75vh;
+  max-width: 100%;
+  max-height: calc(100dvh - var(--nav-height) - var(--dock-height) - 36px);
   width: auto;
   height: auto;
   object-fit: contain;
   user-select: none;
   -webkit-user-drag: none;
+  border-radius: 6px;
 }
 
 .spread-spine-overlay {
