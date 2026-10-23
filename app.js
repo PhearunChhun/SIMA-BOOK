@@ -687,10 +687,10 @@
         width: 432,
         height: 648,
         size: 'stretch',
-        minWidth: 160,
-        maxWidth: 864,
-        minHeight: 220,
-        maxHeight: 1296,
+        minWidth: 390,
+        maxWidth: 900,
+        minHeight: 250,
+        maxHeight: 1400,
         maxShadowOpacity: 0.5,
         showCover: false,
         usePortrait: true,
@@ -1071,12 +1071,37 @@
       }
     });
 
+    // --- Layout & Orientation Manager ---
+    function updateLayoutOrientation() {
+      const isPortrait = window.innerWidth < 780 && window.innerHeight > window.innerWidth;
+      const prev = document.body.classList.contains('portrait-mode');
+      document.body.classList.toggle('portrait-mode', isPortrait);
+      if (prev !== isPortrait && state.pageFlip) {
+        setTimeout(() => {
+          state.pageFlip.update();
+          updateUIState();
+        }, 60);
+      }
+    }
+
     window.addEventListener('resize', () => {
+      updateLayoutOrientation();
       if (state.viewMode === 'spread') {
         updateSpreadView();
       } else if (state.pageFlip) {
         state.pageFlip.update();
       }
+    });
+
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => {
+        updateLayoutOrientation();
+        if (state.viewMode === 'spread') {
+          updateSpreadView();
+        } else if (state.pageFlip) {
+          state.pageFlip.update();
+        }
+      }, 150);
     });
   }
 
@@ -1089,6 +1114,10 @@
     initKeyboardControls();
     initSpreadZoomAndPan();
     initMobileTouchGestures();
+    
+    // Initial layout orientation detection
+    const isPortrait = window.innerWidth < 780 && window.innerHeight > window.innerWidth;
+    document.body.classList.toggle('portrait-mode', isPortrait);
 
 
     try {

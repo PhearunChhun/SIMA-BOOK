@@ -163,7 +163,9 @@ button:focus-visible {
   display: flex;
   flex-direction: column;
   width: 100vw;
+  width: 100%;
   height: 100vh;
+  height: 100dvh;
   position: relative;
   overflow: hidden;
   background: var(--desk-surface);
@@ -353,13 +355,16 @@ button:focus-visible {
 
 /* --- Reading Stage --- */
 .reading-stage {
-  flex: 1;
+  flex: 1 1 0%;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  padding: 20px 40px calc(var(--dock-height) + 20px) 40px;
+  padding: 8px 16px;
 }
 
 .stage-ambient-light {
@@ -426,6 +431,8 @@ button:focus-visible {
   position: relative;
   width: 100%;
   height: 100%;
+  min-height: 0;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -438,6 +445,44 @@ button:focus-visible {
   box-shadow: var(--book-shadow);
   border-radius: 6px;
   transition: box-shadow var(--transition-normal);
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* Landscape 2-page mode (Desktop, Laptop, Tablet landscape) */
+#flipbook {
+  width: 100%;
+  max-width: calc((100dvh - var(--nav-height) - var(--dock-height) - 36px) * (4 / 3));
+  aspect-ratio: 4 / 3;
+}
+
+/* Portrait 1-page mode (Mobile Phones in Portrait, Tablets in Portrait) */
+body.portrait-mode #flipbook {
+  width: 100%;
+  max-width: min(calc(100vw - 20px), calc((100dvh - var(--nav-height) - var(--dock-height) - 20px) * (2 / 3)));
+  aspect-ratio: 2 / 3;
+}
+
+/* Ensure StPageFlip canvas fills aspect-ratio container without overflowing */
+.flipbook .stf__parent {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100% !important;
+  max-height: 100% !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+}
+
+.flipbook .stf__wrapper {
+  width: 100% !important;
+  height: 100% !important;
+  padding-bottom: 0 !important;
+}
+
+.flipbook canvas {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: contain;
 }
 
 /* Page Item Inside StPageFlip */
@@ -743,23 +788,22 @@ button:focus-visible {
 
 /* --- Bottom Dock --- */
 .bottom-dock {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: calc(100% - 48px);
-  max-width: 1100px;
+  flex: 0 0 auto;
+  position: relative;
+  width: calc(100% - 32px);
+  max-width: 1080px;
   height: var(--dock-height);
+  margin: 0 auto max(12px, var(--safe-bottom)) auto;
   background: var(--bg-glass);
   backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
   border: 1px solid var(--border-glass);
-  border-radius: 20px;
-  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.4);
+  border-radius: 18px;
+  box-shadow: 0 10px 32px rgba(0, 0, 0, 0.45);
   z-index: 50;
   display: flex;
   align-items: center;
-  padding: 0 20px;
+  padding: 0 16px;
 }
 
 .dock-container {
@@ -1520,8 +1564,8 @@ kbd {
 /* Tablets in Portrait, Foldables & Large Phones (<= 768px) */
 @media (max-width: 768px) {
   :root {
-    --nav-height: 56px;
-    --dock-height: 62px;
+    --nav-height: 54px;
+    --dock-height: 58px;
   }
 
   .top-nav {
@@ -1549,7 +1593,7 @@ kbd {
   }
 
   .nav-actions {
-    gap: 5px;
+    gap: 4px;
   }
 
   .nav-btn {
@@ -1562,37 +1606,31 @@ kbd {
     height: 18px;
   }
 
-  /* Hide low-priority buttons on smaller screens to prevent header wrapping */
+  /* Keep essential reading tools only in mobile top bar */
   #btnHelp,
-  .nav-actions a[download],
+  .nav-actions a.nav-btn,
   #btnBookmark,
+  #btnAudio,
+  #btnFullscreen,
   .nav-divider {
-    display: none;
+    display: none !important;
   }
 
   /* Stage & Floating Arrows */
   .reading-stage {
-    padding: 8px 10px calc(var(--dock-height) + 12px) 10px;
+    padding: 6px 12px;
   }
 
+  /* Hide floating arrows on phone & tablet portrait; thumb swipe handles navigation cleanly */
   .floating-arrow {
-    width: 40px;
-    height: 40px;
+    display: none !important;
   }
 
-  .floating-arrow svg {
-    width: 22px;
-    height: 22px;
-  }
-
-  .arrow-left { left: 8px; }
-  .arrow-right { right: 8px; }
-
-  /* Bottom Dock */
+  /* Bottom Dock - in-flow flex child */
   .bottom-dock {
     height: var(--dock-height);
     width: calc(100% - 20px);
-    bottom: max(8px, var(--safe-bottom));
+    margin: 0 auto max(8px, var(--safe-bottom)) auto;
     padding: 0 10px;
     border-radius: 14px;
   }
@@ -1636,8 +1674,8 @@ kbd {
 /* Standard Mobile Devices (<= 540px) */
 @media (max-width: 540px) {
   :root {
-    --nav-height: 50px;
-    --dock-height: 56px;
+    --nav-height: 48px;
+    --dock-height: 52px;
   }
 
   .top-nav {
@@ -1660,12 +1698,6 @@ kbd {
     letter-spacing: 0.5px;
   }
 
-  /* Keep essential reading tools only in mobile top bar */
-  #btnAudio,
-  #btnFullscreen {
-    display: none;
-  }
-
   .nav-actions {
     gap: 3px;
   }
@@ -1680,20 +1712,15 @@ kbd {
     height: 17px;
   }
 
-  /* Hide floating arrows on phone portrait; thumb swipe handles navigation cleanly */
-  .floating-arrow {
-    display: none !important;
-  }
-
   .reading-stage {
-    padding: 6px 6px calc(var(--dock-height) + 8px) 6px;
+    padding: 4px 8px;
   }
 
   /* Bottom Dock Mobile Layout */
   .bottom-dock {
     height: var(--dock-height);
     width: calc(100% - 12px);
-    bottom: max(6px, var(--safe-bottom));
+    margin: 0 auto max(6px, var(--safe-bottom)) auto;
     padding: 0 6px;
     border-radius: 12px;
   }
@@ -1764,8 +1791,8 @@ kbd {
   /* Spread Card Mobile Containment */
   .spread-canvas-card canvas,
   .spread-canvas-card img.spread-img {
-    max-width: 98vw;
-    max-height: calc(100vh - var(--nav-height) - var(--dock-height) - 24px);
+    max-width: 100%;
+    max-height: 100%;
   }
 }
 
@@ -1791,8 +1818,8 @@ kbd {
 /* Mobile Landscape Orientation (Optimized for side-by-side reading on phones) */
 @media (max-height: 520px) and (orientation: landscape) {
   :root {
-    --nav-height: 42px;
-    --dock-height: 46px;
+    --nav-height: 40px;
+    --dock-height: 44px;
   }
 
   .top-nav {
@@ -1818,10 +1845,12 @@ kbd {
   .book-subtitle,
   .btn-label,
   #btnHelp,
-  .nav-actions a[download],
+  .nav-actions a.nav-btn,
   #btnBookmark,
+  #btnAudio,
+  #btnFullscreen,
   .nav-divider {
-    display: none;
+    display: none !important;
   }
 
   .nav-actions {
@@ -1839,7 +1868,7 @@ kbd {
 
   /* Stage & Spread Container in Landscape */
   .reading-stage {
-    padding: 2px 8px calc(var(--dock-height) + 4px) 8px;
+    padding: 2px 8px;
   }
 
   .floating-arrow {
@@ -1859,7 +1888,7 @@ kbd {
   .bottom-dock {
     height: var(--dock-height);
     width: calc(100% - 16px);
-    bottom: max(3px, var(--safe-bottom));
+    margin: 0 auto max(2px, var(--safe-bottom)) auto;
     padding: 0 8px;
     border-radius: 10px;
   }
@@ -1895,7 +1924,7 @@ kbd {
 
   .spread-canvas-card canvas,
   .spread-canvas-card img.spread-img {
-    max-height: calc(100vh - var(--nav-height) - var(--dock-height) - 8px);
-    max-width: 96vw;
+    max-height: 100%;
+    max-width: 100%;
   }
 }
