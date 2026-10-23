@@ -1,7 +1,7 @@
 /**
- * THE SIMA JOURNEY — INTERACTIVE 3D DIGITAL FLIPBOOK
- * Core Application Engine: PDF.js streaming, StPageFlip physics, procedural audio,
- * live search, table of contents, and responsive dual-mode reading.
+ * THE SIMA JOURNEY — ULTRA-FAST 3D DIGITAL FLIPBOOK
+ * High-performance mobile & desktop engine powered by optimized WebP page assets,
+ * StPageFlip physics, procedural audio, instant live search, and touch swipe gestures.
  */
 
 (function () {
@@ -9,7 +9,6 @@
 
   // --- Global Application State ---
   const state = {
-    pdfDoc: null,
     bookData: null,
     currentSpread: 1, // 1 to 254
     totalSpreads: 254,
@@ -18,30 +17,27 @@
     theme: localStorage.getItem('sima_theme') || 'obsidian',
     soundEnabled: localStorage.getItem('sima_sound') !== 'false',
     bookmarks: JSON.parse(localStorage.getItem('sima_bookmarks') || '[]'),
-    
-    // Zoom & Pan state for Spread mode
+
+    // Zoom & Pan for Spread mode
     zoom: 1.0,
     pan: { x: 0, y: 0 },
     isPanning: false,
     panStart: { x: 0, y: 0 },
-    
+
     // Auto-Play Slideshow
     autoplayActive: false,
     autoplayTimer: null,
     autoplayIntervalMs: 5000,
 
-    // Flipbook instance & rendering caches
+    // Flipbook instance & audio
     pageFlip: null,
-    spreadCache: new Map(), // LRU Cache: spreadNum -> HTMLCanvasElement
-    cacheLimit: 14,
-    isRendering: false,
-    audioCtx: null
-  };
+    audioCtx: null,
 
-  // Configure PDF.js Worker
-  if (window.pdfjsLib) {
-    window.pdfjsLib.GlobalWorkerOptions.workerSrc = './lib/pdf.worker.min.js';
-  }
+    // Mobile touch tracking
+    touchStartX: 0,
+    touchStartY: 0,
+    touchStartTime: 0
+  };
 
   // --- DOM Elements Cache ---
   const DOM = {
@@ -54,7 +50,7 @@
     spreadWrapper: document.getElementById('spreadWrapper'),
     spreadViewport: document.getElementById('spreadViewport'),
     spreadCard: document.getElementById('spreadCard'),
-    spreadCanvas: document.getElementById('spreadCanvas'),
+    spreadImg: document.getElementById('spreadImg'),
     loadingOverlay: document.getElementById('loadingOverlay'),
     loadingStatusText: document.getElementById('loadingStatusText'),
     loadingProgressBar: document.getElementById('loadingProgressBar'),
@@ -141,8 +137,7 @@
       const ctx = state.audioCtx;
       const now = ctx.currentTime;
 
-      // Create pink noise buffer for realistic paper rustle
-      const bufferSize = ctx.sampleRate * 0.28; // ~280ms duration
+      const bufferSize = Math.floor(ctx.sampleRate * 0.22); // ~220ms
       const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
       const output = noiseBuffer.getChannelData(0);
       let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
@@ -154,33 +149,31 @@
         b3 = 0.86650 * b3 + white * 0.3104856;
         b4 = 0.55000 * b4 + white * 0.5329522;
         b5 = -0.7616 * b5 - white * 0.0168980;
-        output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.08;
+        output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.07;
         b6 = white * 0.115926;
       }
 
       const whiteNoise = ctx.createBufferSource();
       whiteNoise.buffer = noiseBuffer;
 
-      // Bandpass Filter Sweep: 300Hz -> 1800Hz -> 500Hz
       const filter = ctx.createBiquadFilter();
       filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(350, now);
-      filter.frequency.exponentialRampToValueAtTime(1600, now + 0.12);
-      filter.frequency.exponentialRampToValueAtTime(450, now + 0.28);
-      filter.Q.setValueAtTime(1.8, now);
+      filter.frequency.setValueAtTime(380, now);
+      filter.frequency.exponentialRampToValueAtTime(1500, now + 0.1);
+      filter.frequency.exponentialRampToValueAtTime(400, now + 0.22);
+      filter.Q.setValueAtTime(1.6, now);
 
-      // Gain Envelope
       const gainNode = ctx.createGain();
       gainNode.gain.setValueAtTime(0.001, now);
-      gainNode.gain.linearRampToValueAtTime(0.45, now + 0.04);
-      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+      gainNode.gain.linearRampToValueAtTime(0.35, now + 0.03);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
 
       whiteNoise.connect(filter);
       filter.connect(gainNode);
       gainNode.connect(ctx.destination);
 
       whiteNoise.start(now);
-      whiteNoise.stop(now + 0.29);
+      whiteNoise.stop(now + 0.23);
     } catch (e) {
       // Audio autoplay policy catch
     }
@@ -191,7 +184,7 @@
     state.theme = themeName;
     document.documentElement.setAttribute('data-theme', themeName);
     localStorage.setItem('sima_theme', themeName);
-    
+
     document.querySelectorAll('.theme-opt').forEach(opt => {
       opt.classList.toggle('active', opt.dataset.setTheme === themeName);
     });
@@ -292,123 +285,40 @@
     return match;
   }
 
-  // --- High-Performance Spread Rendering with LRU Cache ---
-  async function renderSpreadCanvas(spreadNum, targetScale = 1.6) {
-    if (state.spreadCache.has(spreadNum)) {
-      return state.spreadCache.get(spreadNum);
-    }
+  // --- Preload Near Images ---
+  function preloadNearbyImages(spreadNum) {
+    const targets = [spreadNum - 1, spreadNum + 1, spreadNum + 2].filter(s => s >= 1 && s <= state.totalSpreads);
+    targets.forEach(s => {
+      // Preload spread
+      const imgSpread = new Image();
+      imgSpread.src = `assets/spreads/spread_${s}.webp`;
 
-    if (!state.pdfDoc) return null;
-
-    try {
-      const page = await state.pdfDoc.getPage(spreadNum);
-      const viewport = page.getViewport({ scale: targetScale });
-
-      const canvas = document.createElement('canvas');
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      const ctx = canvas.getContext('2d', { alpha: false });
-
-      await page.render({
-        canvasContext: ctx,
-        viewport: viewport
-      }).promise;
-
-      // LRU eviction
-      if (state.spreadCache.size >= state.cacheLimit) {
-        const oldestKey = state.spreadCache.keys().next().value;
-        state.spreadCache.delete(oldestKey);
-      }
-
-      state.spreadCache.set(spreadNum, canvas);
-      return canvas;
-    } catch (err) {
-      console.error(`Error rendering spread ${spreadNum}:`, err);
-      return null;
-    }
+      // Preload single pages
+      const pL = (s - 1) * 2 + 1;
+      const pR = s * 2;
+      const imgL = new Image();
+      imgL.src = `assets/pages/page_${pL}.webp`;
+      const imgR = new Image();
+      imgR.src = `assets/pages/page_${pR}.webp`;
+    });
   }
 
   // --- Render Spread in Mode 2 (Cinema Spread View) ---
-  async function updateSpreadView() {
+  function updateSpreadView() {
     if (state.viewMode !== 'spread') return;
     const spreadNum = state.currentSpread;
-    const cachedCanvas = await renderSpreadCanvas(spreadNum, 2.0);
+    const src = `assets/spreads/spread_${spreadNum}.webp`;
 
-    if (!cachedCanvas) return;
-
-    const canvas = DOM.spreadCanvas;
-    canvas.width = cachedCanvas.width;
-    canvas.height = cachedCanvas.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(cachedCanvas, 0, 0);
-
+    if (DOM.spreadImg.src !== src) {
+      DOM.spreadImg.src = src;
+    }
     applySpreadZoomAndPan();
+    preloadNearbyImages(spreadNum);
   }
 
   function applySpreadZoomAndPan() {
     DOM.spreadCard.style.transform = `scale(${state.zoom}) translate(${state.pan.x}px, ${state.pan.y}px)`;
     DOM.zoomLevelText.textContent = `${Math.round(state.zoom * 100)}%`;
-  }
-
-  // --- Render Pages in Mode 1 (3D Flip Book) ---
-  async function updateFlipBookPages() {
-    if (state.viewMode !== 'flip' || !state.pageFlip) return;
-
-    const s = state.currentSpread;
-    // Pre-render visible spread and nearby spreads
-    const spreadsToRender = [s - 1, s, s + 1, s + 2].filter(n => n >= 1 && n <= state.totalSpreads);
-
-    for (const spreadNum of spreadsToRender) {
-      const pLeft = (spreadNum - 1) * 2; // StPageFlip 0-indexed page
-      const pRight = pLeft + 1;
-
-      const pageLeftEl = document.querySelector(`.book-page-item[data-page-index="${pLeft}"]`);
-      const pageRightEl = document.querySelector(`.book-page-item[data-page-index="${pRight}"]`);
-
-      if (!pageLeftEl && !pageRightEl) continue;
-
-      // Render offscreen spread
-      const spreadCanvas = await renderSpreadCanvas(spreadNum, 1.8);
-      if (!spreadCanvas) continue;
-
-      const sw = spreadCanvas.width;
-      const sh = spreadCanvas.height;
-      const halfW = sw / 2;
-
-      // Draw Left Page
-      if (pageLeftEl) {
-        let leftCanvas = pageLeftEl.querySelector('canvas');
-        if (!leftCanvas) {
-          leftCanvas = document.createElement('canvas');
-          pageLeftEl.appendChild(leftCanvas);
-        }
-        if (leftCanvas.dataset.renderedSpread !== String(spreadNum)) {
-          leftCanvas.width = halfW;
-          leftCanvas.height = sh;
-          const lCtx = leftCanvas.getContext('2d');
-          lCtx.drawImage(spreadCanvas, 0, 0, halfW, sh, 0, 0, halfW, sh);
-          leftCanvas.dataset.renderedSpread = String(spreadNum);
-          pageLeftEl.classList.add('has-rendered');
-        }
-      }
-
-      // Draw Right Page
-      if (pageRightEl) {
-        let rightCanvas = pageRightEl.querySelector('canvas');
-        if (!rightCanvas) {
-          rightCanvas = document.createElement('canvas');
-          pageRightEl.appendChild(rightCanvas);
-        }
-        if (rightCanvas.dataset.renderedSpread !== String(spreadNum)) {
-          rightCanvas.width = halfW;
-          rightCanvas.height = sh;
-          const rCtx = rightCanvas.getContext('2d');
-          rCtx.drawImage(spreadCanvas, halfW, 0, halfW, sh, 0, 0, halfW, sh);
-          rightCanvas.dataset.renderedSpread = String(spreadNum);
-          pageRightEl.classList.add('has-rendered');
-        }
-      }
-    }
   }
 
   // --- UI Synchronizer ---
@@ -428,7 +338,7 @@
     DOM.pageScrubber.value = s;
     DOM.scrubberTooltip.textContent = `Spread ${s} (p.${pLeft}–${pRight})`;
 
-    // Update Floating Arrows
+    // Update Nav Buttons
     DOM.navPrev.disabled = s <= 1;
     DOM.navNext.disabled = s >= state.totalSpreads;
     DOM.btnPrevDock.disabled = s <= 1;
@@ -449,7 +359,7 @@
     if (state.viewMode === 'spread') {
       updateSpreadView();
     } else {
-      updateFlipBookPages();
+      preloadNearbyImages(s);
     }
   }
 
@@ -480,7 +390,7 @@
     } else if (state.viewMode === 'spread') {
       const card = DOM.spreadCard;
       card.classList.remove('flipping-next', 'flipping-prev');
-      void card.offsetWidth; // Trigger reflow
+      void card.offsetWidth;
       if (spreadNum > prevSpreadNum) {
         card.classList.add('flipping-next');
       } else {
@@ -524,7 +434,7 @@
         state.pageFlip.update();
         state.pageFlip.turnToPage((state.currentSpread - 1) * 2);
       }
-      updateFlipBookPages();
+      preloadNearbyImages(state.currentSpread);
     }
   }
 
@@ -642,14 +552,12 @@
         const textLower = item.text.toLowerCase();
         const matchIdx = textLower.indexOf(qLower);
         if (matchIdx !== -1) {
-          // Extract snippet with context
           const start = Math.max(0, matchIdx - 40);
           const end = Math.min(item.text.length, matchIdx + query.length + 60);
           let snippet = item.text.slice(start, end);
           if (start > 0) snippet = '...' + snippet;
           if (end < item.text.length) snippet = snippet + '...';
 
-          // Highlight
           const re = new RegExp(`(${query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
           const highlighted = snippet.replace(re, '<mark>$1</mark>');
 
@@ -691,7 +599,7 @@
 
     DOM.searchInput.addEventListener('input', (e) => {
       clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => executeSearch(e.target.value), 200);
+      debounceTimer = setTimeout(() => executeSearch(e.target.value), 180);
     });
 
     DOM.clearSearch.addEventListener('click', () => {
@@ -708,7 +616,7 @@
     });
   }
 
-  // --- Thumbnails Grid Initialization with Lazy Render ---
+  // --- Thumbnails Grid Initialization with Native WebP Images ---
   function initThumbnailsGrid() {
     let html = '';
     for (let s = 1; s <= state.totalSpreads; s++) {
@@ -716,8 +624,8 @@
       const pRight = s * 2;
       html += `
         <div class="thumb-card ${s === state.currentSpread ? 'active' : ''}" data-spread="${s}">
-          <div class="thumb-preview" id="thumbPreview-${s}">
-            <span>${s}</span>
+          <div class="thumb-preview">
+            <img src="assets/thumbs/thumb_${s}.webp" loading="lazy" alt="Spread ${s}" width="324" height="243" />
           </div>
           <div class="thumb-info">
             <span>Spread ${s}</span>
@@ -735,96 +643,45 @@
         closeAllDrawers();
       });
     });
-
-    // Lazy load thumbnail previews when scrolled into view
-    const observer = new IntersectionObserver((entries, obs) => {
-      entries.forEach(async entry => {
-        if (entry.isIntersecting) {
-          const card = entry.target;
-          const s = parseInt(card.dataset.spread, 10);
-          obs.unobserve(card);
-
-          const previewEl = document.getElementById(`thumbPreview-${s}`);
-          if (!previewEl || previewEl.querySelector('canvas')) return;
-
-          const cachedCanvas = await renderSpreadCanvas(s, 0.4);
-          if (cachedCanvas && previewEl) {
-            previewEl.innerHTML = '';
-            const thumbCanvas = document.createElement('canvas');
-            thumbCanvas.width = cachedCanvas.width;
-            thumbCanvas.height = cachedCanvas.height;
-            const tCtx = thumbCanvas.getContext('2d');
-            tCtx.drawImage(cachedCanvas, 0, 0);
-            previewEl.appendChild(thumbCanvas);
-          }
-        }
-      });
-    }, { root: DOM.thumbsDrawer, rootMargin: '100px' });
-
-    DOM.thumbsGrid.querySelectorAll('.thumb-card').forEach(c => observer.observe(c));
   }
 
-  // --- Mode 1: Initialize StPageFlip ---
+  // --- Mode 1: Initialize StPageFlip with Pre-rendered WebP Pages ---
   function initFlipBook() {
     if (!window.St || !window.St.PageFlip) {
-      console.warn('St.PageFlip not loaded, using Spread mode as primary');
+      console.warn('St.PageFlip not loaded, using Spread mode');
       setViewMode('spread');
       return;
     }
 
-    // Generate 508 individual page divs
     const container = DOM.flipbook;
     container.innerHTML = '';
 
-    for (let p = 0; p < state.totalPages; p++) {
-      const pageDiv = document.createElement('div');
-      pageDiv.className = `book-page-item ${p % 2 === 0 ? 'page-left' : 'page-right'}`;
-      pageDiv.dataset.pageIndex = String(p);
-
-      // Skeleton loader placeholder
-      const skeleton = document.createElement('div');
-      skeleton.className = 'page-skeleton';
-      skeleton.innerHTML = `
-        <div class="skeleton-shimmer"></div>
-        <div class="skeleton-info">
-          <div class="skeleton-badge">SIMA</div>
-          <span class="skeleton-num">Page ${p + 1}</span>
-        </div>
-      `;
-      pageDiv.appendChild(skeleton);
-
-      // Pre-create canvas
-      const canvas = document.createElement('canvas');
-      pageDiv.appendChild(canvas);
-
-      // Corner curl hint
-      const corner = document.createElement('div');
-      corner.className = 'corner-hint';
-      pageDiv.appendChild(corner);
-
-      container.appendChild(pageDiv);
+    // Collect all 508 single page URLs
+    const pageUrls = [];
+    for (let p = 1; p <= state.totalPages; p++) {
+      pageUrls.push(`assets/pages/page_${p}.webp`);
     }
 
-    // Create PageFlip Instance
     try {
       state.pageFlip = new window.St.PageFlip(container, {
         width: 432,
         height: 648,
         size: 'stretch',
-        minWidth: 320,
-        maxWidth: 700,
-        minHeight: 480,
-        maxHeight: 1050,
+        minWidth: 300,
+        maxWidth: 720,
+        minHeight: 450,
+        maxHeight: 1080,
         maxShadowOpacity: 0.5,
         showCover: false,
         usePortrait: true,
-        flippingTime: 750,
+        flippingTime: 700,
         mobileScrollSupport: true,
         useMouseEvents: true,
-        swipeDistance: 35
+        swipeDistance: 30
       });
 
-      state.pageFlip.loadFromHTML(container.querySelectorAll('.book-page-item'));
+      // Load directly from hardware-accelerated WebP page images
+      state.pageFlip.loadFromImages(pageUrls);
 
       state.pageFlip.on('flip', (e) => {
         const pageIdx = e.data;
@@ -843,16 +700,46 @@
       });
 
     } catch (err) {
-      console.error('Error initializing StPageFlip:', err);
+      console.error('Error initializing StPageFlip with images:', err);
       setViewMode('spread');
     }
+  }
+
+  // --- Mobile Touch Gestures (Swiping & Tap Navigation) ---
+  function initMobileTouchGestures() {
+    const stage = DOM.readingStage;
+
+    stage.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        state.touchStartX = e.touches[0].clientX;
+        state.touchStartY = e.touches[0].clientY;
+        state.touchStartTime = Date.now();
+      }
+    }, { passive: true });
+
+    stage.addEventListener('touchend', (e) => {
+      if (e.changedTouches.length !== 1) return;
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const deltaX = touchEndX - state.touchStartX;
+      const deltaY = touchEndY - state.touchStartY;
+      const elapsed = Date.now() - state.touchStartTime;
+
+      // Horizontal swipe detection (> 45px, mostly horizontal)
+      if (Math.abs(deltaX) > 45 && Math.abs(deltaX) > Math.abs(deltaY) * 1.5 && elapsed < 400) {
+        if (deltaX < 0) {
+          nextSpread(); // Swipe Left -> Next
+        } else {
+          prevSpread(); // Swipe Right -> Prev
+        }
+      }
+    }, { passive: true });
   }
 
   // --- Spread Mode: Zoom & Pan Handlers ---
   function initSpreadZoomAndPan() {
     const vp = DOM.spreadViewport;
 
-    // Zoom In / Out / Reset
     DOM.btnZoomIn.addEventListener('click', () => {
       state.zoom = Math.min(3.0, state.zoom + 0.25);
       applySpreadZoomAndPan();
@@ -870,18 +757,15 @@
       applySpreadZoomAndPan();
     });
 
-    // Mouse Wheel Zoom centered on cursor
     vp.addEventListener('wheel', (e) => {
       if (state.viewMode !== 'spread') return;
       e.preventDefault();
       const delta = e.deltaY > 0 ? -0.15 : 0.15;
-      const prevZoom = state.zoom;
       state.zoom = Math.min(3.0, Math.max(1.0, state.zoom + delta));
       if (state.zoom === 1.0) state.pan = { x: 0, y: 0 };
       applySpreadZoomAndPan();
     }, { passive: false });
 
-    // Drag to Pan when zoomed
     vp.addEventListener('mousedown', (e) => {
       if (state.zoom <= 1.0) return;
       state.isPanning = true;
@@ -907,7 +791,6 @@
   // --- Keyboard Shortcuts ---
   function initKeyboardControls() {
     window.addEventListener('keydown', (e) => {
-      // Ignore if typing in input
       if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
         if (e.key === 'Escape') {
           document.activeElement.blur();
@@ -922,7 +805,7 @@
           e.preventDefault();
           nextSpread();
           break;
-        case ' ': // Spacebar
+        case ' ':
           e.preventDefault();
           if (e.shiftKey) prevSpread();
           else nextSpread();
@@ -1032,17 +915,14 @@
 
   // --- Bind Event Listeners ---
   function bindEvents() {
-    // Stage Arrows
     DOM.navPrev.addEventListener('click', prevSpread);
     DOM.navNext.addEventListener('click', nextSpread);
 
-    // Dock Buttons
     DOM.btnPrevDock.addEventListener('click', prevSpread);
     DOM.btnNextDock.addEventListener('click', nextSpread);
     DOM.btnFirst.addEventListener('click', () => goToSpread(1));
     DOM.btnLast.addEventListener('click', () => goToSpread(state.totalSpreads));
 
-    // Scrubber
     DOM.pageScrubber.addEventListener('input', (e) => {
       const s = parseInt(e.target.value, 10);
       const pLeft = (s - 1) * 2 + 1;
@@ -1056,7 +936,6 @@
       goToSpread(s);
     });
 
-    // Jump Input
     DOM.btnJumpGo.addEventListener('click', () => {
       const pageVal = parseInt(DOM.jumpInput.value, 10);
       if (!isNaN(pageVal) && pageVal >= 1 && pageVal <= state.totalPages) {
@@ -1072,12 +951,10 @@
       }
     });
 
-    // View Mode Toggle
     DOM.btnViewMode.addEventListener('click', () => {
       setViewMode(state.viewMode === 'flip' ? 'spread' : 'flip');
     });
 
-    // Theme Selector
     DOM.btnTheme.addEventListener('click', (e) => {
       e.stopPropagation();
       DOM.themeMenu.classList.toggle('show');
@@ -1090,7 +967,6 @@
       });
     });
 
-    // Audio & Bookmark
     DOM.btnAudio.addEventListener('click', () => {
       state.soundEnabled = !state.soundEnabled;
       localStorage.setItem('sima_sound', state.soundEnabled);
@@ -1098,11 +974,8 @@
     });
 
     DOM.btnBookmark.addEventListener('click', toggleBookmark);
-
-    // Auto-Play
     DOM.btnAutoplay.addEventListener('click', toggleAutoplay);
 
-    // Drawers
     DOM.btnToc.addEventListener('click', () => openDrawer(DOM.tocDrawer));
     DOM.closeToc.addEventListener('click', closeAllDrawers);
 
@@ -1118,24 +991,20 @@
     DOM.closeBookmarks.addEventListener('click', closeAllDrawers);
     DOM.drawerBackdrop.addEventListener('click', closeAllDrawers);
 
-    // Help Modal
     DOM.btnHelp.addEventListener('click', () => DOM.helpModal.classList.add('show'));
     DOM.closeHelp.addEventListener('click', () => DOM.helpModal.classList.remove('show'));
     DOM.helpModal.addEventListener('click', (e) => {
       if (e.target === DOM.helpModal) DOM.helpModal.classList.remove('show');
     });
 
-    // Fullscreen
     DOM.btnFullscreen.addEventListener('click', toggleFullscreen);
 
-    // Close dropdowns on outside click
     window.addEventListener('click', (e) => {
       if (!e.target.closest('.theme-dropdown')) {
         DOM.themeMenu.classList.remove('show');
       }
     });
 
-    // Window Resize Adjustments
     window.addEventListener('resize', () => {
       if (state.viewMode === 'spread') {
         updateSpreadView();
@@ -1153,71 +1022,55 @@
     bindEvents();
     initKeyboardControls();
     initSpreadZoomAndPan();
+    initMobileTouchGestures();
+
+    // Check if mobile screen (width < 768px): default to Spread view for best mobile reading
+    if (window.innerWidth < 768) {
+      state.viewMode = 'spread';
+      DOM.bookWrapper.style.display = 'none';
+      DOM.spreadWrapper.style.display = 'flex';
+      DOM.viewModeLabel.textContent = '3D Flip Book';
+    }
 
     try {
-      // 1. Load Pre-indexed Book Metadata
-      DOM.loadingStatusText.textContent = "Loading chapters, timeline and search index...";
-      DOM.loadingProgressBar.style.width = "25%";
+      DOM.loadingStatusText.textContent = "Loading book chapters & index...";
+      DOM.loadingProgressBar.style.width = "40%";
+
       const resp = await fetch('book_data.json');
       state.bookData = await resp.json();
       state.totalSpreads = state.bookData.totalSpreads;
       state.totalPages = state.bookData.totalPages;
       DOM.pageScrubber.max = state.totalSpreads;
 
-      // Initialize UI drawers
       initTableOfContents();
       initLiveSearch();
       initThumbnailsGrid();
       renderBookmarksDrawer();
 
-      // 2. Stream Master PDF via HTTP Range Requests
-      DOM.loadingStatusText.textContent = "Connecting master PDF stream (HTTP 206 Partial)...";
-      DOM.loadingProgressBar.style.width = "50%";
+      DOM.loadingProgressBar.style.width = "80%";
+      DOM.loadingStatusText.textContent = "Loading book engine...";
 
-      const loadingTask = window.pdfjsLib.getDocument({
-        url: '/book.pdf',
-        cMapUrl: './lib/cmaps/',
-        cMapPacked: true,
-        standardFontDataUrl: './lib/standard_fonts/',
-        rangeChunkSize: 65536 * 4,
-        disableAutoFetch: true,
-        disableStream: false
-      });
-
-      loadingTask.onProgress = (progress) => {
-        if (progress.total > 0) {
-          const pct = Math.min(95, Math.round((progress.loaded / progress.total) * 100));
-          DOM.loadingProgressBar.style.width = `${pct}%`;
-        }
-      };
-
-      state.pdfDoc = await loadingTask.promise;
-      DOM.loadingProgressBar.style.width = "90%";
-      DOM.loadingStatusText.textContent = "Preparing 3D page curl physics engine...";
-
-      // 3. Initialize StPageFlip
+      // Initialize Flipbook with WebP image pages
       initFlipBook();
 
-      // 4. Initial Render
+      // Initial View Update
       DOM.loadingProgressBar.style.width = "100%";
       updateUIState();
 
-      // Dismiss Loading Overlay
+      // Dismiss Loading Overlay instantly
       setTimeout(() => {
         DOM.loadingOverlay.classList.add('hidden');
-      }, 350);
+      }, 150);
 
     } catch (err) {
-      console.error('Failed to initialize flipbook:', err);
-      DOM.loadingStatusText.textContent = `Error: ${err.message}. Retrying in Spread Mode...`;
+      console.error('Initialization error:', err);
       setViewMode('spread');
       setTimeout(() => {
         DOM.loadingOverlay.classList.add('hidden');
-      }, 1000);
+      }, 300);
     }
   }
 
-  // Start on DOM ready
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {

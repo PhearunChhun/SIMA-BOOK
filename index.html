@@ -61,6 +61,11 @@
           <span class="btn-label">Bookmark</span>
         </button>
 
+        <a href="book.pdf" download="The-SIMA-Journey-Book.pdf" class="nav-btn" title="Download Master PDF" aria-label="Download PDF">
+          <svg class="icon" viewBox="0 0 24 24"><path fill="currentColor" d="M19 9h-4V3H9v6H5l7 7l7-7zM5 18v2h14v-2H5z"/></svg>
+          <span class="btn-label">PDF</span>
+        </a>
+
         <div class="nav-divider"></div>
 
         <!-- View Mode Toggle -->
@@ -138,7 +143,7 @@
       <div class="spread-wrapper" id="spreadWrapper" style="display: none;">
         <div class="spread-viewport" id="spreadViewport">
           <div class="spread-canvas-card" id="spreadCard">
-            <canvas id="spreadCanvas"></canvas>
+            <img id="spreadImg" class="spread-img" alt="The SIMA Journey Spread" />
             <div class="spread-spine-overlay"></div>
           </div>
         </div>
